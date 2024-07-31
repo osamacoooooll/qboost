@@ -15,7 +15,7 @@
 import numpy as np
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 import dimod
 from dwave.system import LeapHybridSampler
@@ -127,12 +127,24 @@ class EnsembleClassifier:
 
         return np.sign(preds)
 
-    def score(self, X, y):
-        """Compute accuracy score on given data."""
+    def score(self, X, y, average='binary'):
+        """Compute accuracy, precision, recall, and F1 score on given data."""
         if sum(self.w) == 0:
-            # Avoid difficulties that occur with handling this below
-            return 0.0
-        return accuracy_score(y, self.predict_class(X))
+            return {
+                'accuracy': 0.0,
+                'precision': 0.0,
+                'recall': 0.0,
+                'f1_score': 0.0
+            }
+        
+        y_pred = self.predict_class(X)
+        
+        return {
+            'accuracy': accuracy_score(y, y_pred),
+            'precision': precision_score(y, y_pred, average=average),
+            'recall': recall_score(y, y_pred, average=average),
+            'f1_score': f1_score(y, y_pred, average=average)
+        }
 
     def squared_error(self, X, y):
         """Compute squared error between predicted and true labels.

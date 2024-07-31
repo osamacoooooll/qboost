@@ -89,7 +89,13 @@ if __name__ == '__main__':
         print('Informative features:', list(range(n_informative)))
         print('Selected features:', qboost.get_selected_features())
 
-        print('Score on test set: {:.3f}'.format(qboost.score(X_test, y_test)))
+        metrics = qboost.score(X_test, y_test)
+
+        print('Metrics on test set:')
+        print(f"Accuracy: {metrics['accuracy']:.3f}")
+        print(f"Precision: {metrics['precision']:.3f}")
+        print(f"Recall: {metrics['recall']:.3f}")
+        print(f"F1 Score: {metrics['f1_score']:.3f}")
 
     elif args.dataset == 'digits':
         if args.digit1 == args.digit2:
@@ -120,7 +126,13 @@ if __name__ == '__main__':
         print('Number of selected features:',
               len(qboost.get_selected_features()))
 
-        print('Score on test set: {:.3f}'.format(qboost.score(X_test, y_test)))
+        metrics = qboost.score(X_test, y_test)
+
+        print('Metrics on test set:')
+        print(f"Accuracy: {metrics['accuracy']:.3f}")
+        print(f"Precision: {metrics['precision']:.3f}")
+        print(f"Recall: {metrics['recall']:.3f}")
+        print(f"F1 Score: {metrics['f1_score']:.3f}")
 
         if args.plot_digits:
             digits = load_digits()
