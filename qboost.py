@@ -139,11 +139,15 @@ class EnsembleClassifier:
         
         y_pred = self.predict_class(X)
         
+        from sklearn.metrics import confusion_matrix
+        cm = confusion_matrix(y, y_pred)
+
         return {
             'accuracy': accuracy_score(y, y_pred),
-            'precision': precision_score(y, y_pred, average=average),
-            'recall': recall_score(y, y_pred, average=average),
-            'f1_score': f1_score(y, y_pred, average=average)
+            'precision': precision_score(y, y_pred, average='binary', zero_division=0),
+            'recall': recall_score(y, y_pred, average='binary', zero_division=0),
+            'f1_score': f1_score(y, y_pred, average='binary', zero_division=0),
+            'confusion_matrix': cm
         }
 
     def squared_error(self, X, y):

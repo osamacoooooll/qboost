@@ -59,6 +59,12 @@ if __name__ == '__main__':
                            help='second digit to include (default: %(default)s)')
     sp_digits.add_argument('--plot-digits', action='store_true',
                            help='plot a random sample of each digit')
+    
+    sp_userBinaryData = subparsers.add_parser('binary', help='user-provided binary data set')
+    sp_userBinaryData.add_argument('--csv-file', type=str, required=True,
+                                   help='path to the CSV file')
+    sp_userBinaryData.add_argument('--label-column', type=str, required=True,
+                                   help='name of the column containing the labels')
 
     args = parser.parse_args()
 
@@ -96,6 +102,9 @@ if __name__ == '__main__':
         print(f"Precision: {metrics['precision']:.3f}")
         print(f"Recall: {metrics['recall']:.3f}")
         print(f"F1 Score: {metrics['f1_score']:.3f}")
+        print()
+        print("Confusion Matrix:")
+        print(metrics['confusion_matrix'])
 
     elif args.dataset == 'digits':
         if args.digit1 == args.digit2:
@@ -133,6 +142,9 @@ if __name__ == '__main__':
         print(f"Precision: {metrics['precision']:.3f}")
         print(f"Recall: {metrics['recall']:.3f}")
         print(f"F1 Score: {metrics['f1_score']:.3f}")
+        print()
+        print("Confusion Matrix:")
+        print(metrics['confusion_matrix'])
 
         if args.plot_digits:
             digits = load_digits()
@@ -151,6 +163,54 @@ if __name__ == '__main__':
                 ax.imshow(image, cmap=plt.cm.gray_r, interpolation='nearest')
 
             plt.show()
+
+    elif args.dataset == 'binary':
+        data = pd.read_csv(args.csv_file)
+        X = data.drop(columns=[args.label_column]).values
+        y = data[args.label_column].values
+
+        if y.dtype == 'bool':
+            y = y.astype(int)
+
+        y = np.where(y == 1, 1, -1)
+
+        print("Number of positive examples:", np.sum(y == 1))
+        print("Number of negative examples:", np.sum(y == -1))
+
+        n_features = np.size(X, 1)
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.4)
+        print('Number of features:', n_features)
+        print('Number of training samples:', len(X_train))
+        print('Number of test samples:', len(X_test))
+
+        if args.cross_validation:
+            # See Boyda et al. (2017), Eq. (17) regarding normalization
+            normalized_lambdas = np.linspace(0.0, 1.75, 10)
+            lambdas = normalized_lambdas / n_features
+            print('Performing cross-validation using {} values of lambda, this make take several minutes...'.format(len(lambdas)))
+            qboost, lam = qboost_lambda_sweep(
+                X_train, y_train, lambdas, verbose=args.verbose)
+        else:
+            qboost = QBoostClassifier(X_train, y_train, args.lam)
+
+        if args.verbose:
+            qboost.report_baseline(X_test, y_test)
+
+        print('Number of selected features:',
+              len(qboost.get_selected_features()))
+
+        metrics = qboost.score(X_test, y_test)
+
+        print('Metrics on test set:')
+        print(f"Accuracy: {metrics['accuracy']:.3f}")
+        print(f"Precision: {metrics['precision']:.3f}")
+        print(f"Recall: {metrics['recall']:.3f}")
+        print(f"F1 Score: {metrics['f1_score']:.3f}")
+        print()
+        print("Confusion Matrix:")
+        print(metrics['confusion_matrix'])
 
     elif not args.dataset:
         parser.print_help()
