@@ -16,6 +16,9 @@ import numpy as np
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import confusion_matrix
+from sklearn.preprocessing import LabelBinarizer
+from sklearn.base import BaseEstimator, ClassifierMixin
 
 import dimod
 from dwave.system import LeapHybridSampler
@@ -139,7 +142,6 @@ class EnsembleClassifier:
         
         y_pred = self.predict_class(X)
         
-        from sklearn.metrics import confusion_matrix
         cm = confusion_matrix(y, y_pred)
 
         return {
@@ -365,3 +367,43 @@ def qboost_lambda_sweep(X, y, lambda_vals, val_fraction=0.4, verbose=False, **kw
             best_lambda = lam
 
     return best_clf, lam
+
+class QBoostOvRClassifier(BaseEstimator, ClassifierMixin):
+    def __init__(self, lam=0.1, weak_clf_scale=None, drop_unused=True):
+        self.lam = lam
+        self.weak_clf_scale = weak_clf_scale
+        self.drop_unused = drop_unused
+        self.classifiers_ = []
+
+    def fit(self, X, y):
+        self.lb_ = LabelBinarizer()
+        Y = self.lb_.fit_transform(y)
+        self.classes_ = self.lb_.classes_
+
+        for i in range(len(self.classes_)):
+            y_binary = np.where(Y[:, i] == 1, 1, -1)
+            clf = QBoostClassifier(
+                X, y_binary, self.lam, self.weak_clf_scale, self.drop_unused)
+            self.classifiers_.append(clf)
+        
+        return self
+
+    def predict(self, X):
+        predictions = np.array([clf.predict(X) for clf in self.classifiers_]).T
+        return self.lb_.inverse_transform(predictions)
+
+    def predict_proba(self, X):
+        proba = np.array([clf.predict(X) for clf in self.classifiers_]).T
+        return proba / np.sum(proba, axis=1, keepdims=True)
+
+    def score(self, X, y):
+        y_pred = self.predict(X)
+        
+        metrics = {
+            "accuracy": accuracy_score(y, y_pred),
+            "precision": precision_score(y, y_pred, average='weighted', zero_division=0),
+            "recall": recall_score(y, y_pred, average='weighted', zero_division=0),
+            "f1_score": f1_score(y, y_pred, average='weighted', zero_division=0),
+            "confusion_matrix": confusion_matrix(y, y_pred)
+        }
+        return metrics

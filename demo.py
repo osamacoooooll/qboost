@@ -23,8 +23,9 @@ except ImportError:
     # Not required for demo
     pass
 
-from qboost import QBoostClassifier, qboost_lambda_sweep
+from qboost import QBoostClassifier, qboost_lambda_sweep, QBoostOvRClassifier
 from datasets import make_blob_data, get_handwritten_digits_data
+from sklearn.preprocessing import LabelEncoder
 
 
 if __name__ == '__main__':
@@ -64,6 +65,12 @@ if __name__ == '__main__':
     sp_userBinaryData.add_argument('--csv-file', type=str, required=True,
                                    help='path to the CSV file')
     sp_userBinaryData.add_argument('--label-column', type=str, required=True,
+                                   help='name of the column containing the labels')
+
+    sp_userMultiClassData = subparsers.add_parser('multi-class', help='user-provided multi-class data set')
+    sp_userMultiClassData.add_argument('--csv-file', type=str, required=True,
+                                   help='path to the CSV file')
+    sp_userMultiClassData.add_argument('--label-column', type=str, required=True,
                                    help='name of the column containing the labels')
 
     args = parser.parse_args()
@@ -200,6 +207,59 @@ if __name__ == '__main__':
 
         print('Number of selected features:',
               len(qboost.get_selected_features()))
+
+        metrics = qboost.score(X_test, y_test)
+
+        print('Metrics on test set:')
+        print(f"Accuracy: {metrics['accuracy']:.3f}")
+        print(f"Precision: {metrics['precision']:.3f}")
+        print(f"Recall: {metrics['recall']:.3f}")
+        print(f"F1 Score: {metrics['f1_score']:.3f}")
+        print()
+        print("Confusion Matrix:")
+        print(metrics['confusion_matrix'])
+
+    elif args.dataset == 'multi-class':
+        data = pd.read_csv(args.csv_file)
+        X = data.drop(columns=[args.label_column]).values
+        y = data[args.label_column].values
+
+        # Encode labels to integers
+        le = LabelEncoder()
+        y = le.fit_transform(y)
+
+        print("Classes found:", le.classes_)
+        for i, class_name in enumerate(le.classes_):
+            print(f"Class {i}: {class_name}")
+
+        n_features = np.size(X, 1)
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.4)
+        print('Number of features:', n_features)
+        print('Number of training samples:', len(X_train))
+        print('Number of test samples:', len(X_test))
+
+        if args.cross_validation:
+            # See Boyda et al. (2017), Eq. (17) regarding normalization
+            normalized_lambdas = np.linspace(0.0, 1.75, 10)
+            lambdas = normalized_lambdas / n_features
+            print('Performing cross-validation using {} values of lambda, this make take several minutes...'.format(len(lambdas)))
+            qboost, lam = qboost_lambda_sweep(
+                X_train, y_train, lambdas, verbose=args.verbose)
+        else:
+            qboost = QBoostOvRClassifier(lam=args.lam)
+            qboost.fit(X_train, y_train)
+
+        if args.verbose:
+            # Assuming qboost has a method for verbose reporting in a multi-class setting
+            for i, clf in enumerate(qboost.classifiers_):
+                print(f"Classifier for class {le.classes_[i]}:")
+                clf.report_baseline(X_test, y_test)
+
+        print('Number of selected features:')
+        for i, clf in enumerate(qboost.classifiers_):
+            print(f"Class {le.classes_[i]} selected features:", clf.get_selected_features())
 
         metrics = qboost.score(X_test, y_test)
 
